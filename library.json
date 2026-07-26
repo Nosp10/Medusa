@@ -1,0 +1,31 @@
+[
+  { "name": "FLIR Boson 640 Thermal Camera", "category": "sensor", "cost_usd": 4200, "power_draw_w": 2.0, "env_rating": "milspec", "synergy_tags": ["thermal", "night-vision", "low-light", "motion-detection"] },
+  { "name": "Hikvision DS-2TD2137 Thermal Bullet", "category": "sensor", "cost_usd": 1350, "power_draw_w": 6.0, "env_rating": "outdoor", "synergy_tags": ["thermal", "night-vision", "motion-detection"] },
+  { "name": "Echodyne EchoGuard 3D Radar", "category": "sensor", "cost_usd": 9500, "power_draw_w": 35.0, "env_rating": "ruggedized", "synergy_tags": ["radar", "all-weather", "motion-detection", "long-range"] },
+  { "name": "Axis Q1798-LE 4K Visible Camera", "category": "sensor", "cost_usd": 1900, "power_draw_w": 12.0, "env_rating": "outdoor", "synergy_tags": ["visible", "day-only", "motion-detection", "video-analytics"] },
+  { "name": "Bosch Blue Line PIR Detector", "category": "sensor", "cost_usd": 60, "power_draw_w": 0.5, "env_rating": "outdoor", "synergy_tags": ["motion-detection", "short-range", "low-power"] },
+
+  { "name": "NVIDIA Jetson Orin NX", "category": "processor", "cost_usd": 899, "power_draw_w": 20.0, "env_rating": "indoor", "synergy_tags": ["edge-compute", "ai-inference", "video-analytics", "high-performance"] },
+  { "name": "NVIDIA Jetson Orin Nano", "category": "processor", "cost_usd": 499, "power_draw_w": 10.0, "env_rating": "indoor", "synergy_tags": ["edge-compute", "ai-inference", "video-analytics", "low-power"] },
+  { "name": "Raspberry Pi CM4 Industrial", "category": "processor", "cost_usd": 75, "power_draw_w": 5.0, "env_rating": "indoor", "synergy_tags": ["basic-compute", "low-power"] },
+  { "name": "Intel NUC 13 Rugged", "category": "processor", "cost_usd": 900, "power_draw_w": 28.0, "env_rating": "ruggedized", "synergy_tags": ["edge-compute", "video-analytics"] },
+  { "name": "Curtiss-Wright Parvus DuraCOR 8044", "category": "processor", "cost_usd": 8500, "power_draw_w": 45.0, "env_rating": "milspec", "synergy_tags": ["edge-compute", "rugged-compute", "ai-inference"] },
+
+  { "name": "Sierra Wireless AirLink RV55", "category": "comms", "cost_usd": 650, "power_draw_w": 6.0, "env_rating": "ruggedized", "synergy_tags": ["cellular", "long-range", "alerting", "encrypted"] },
+  { "name": "Silvus StreamCaster 4200 MANET", "category": "comms", "cost_usd": 7500, "power_draw_w": 15.0, "env_rating": "milspec", "synergy_tags": ["manet", "encrypted", "high-bandwidth", "alerting", "long-range"] },
+  { "name": "Iridium 9603N Satcom Module", "category": "comms", "cost_usd": 1100, "power_draw_w": 2.0, "env_rating": "ruggedized", "synergy_tags": ["satcom", "global-coverage", "low-bandwidth", "alerting"] },
+  { "name": "RAK7289 LoRaWAN Gateway", "category": "comms", "cost_usd": 200, "power_draw_w": 3.0, "env_rating": "outdoor", "synergy_tags": ["lora", "low-bandwidth", "long-range", "low-power"] },
+  { "name": "Ubiquiti airFiber PtP Link", "category": "comms", "cost_usd": 300, "power_draw_w": 8.0, "env_rating": "outdoor", "synergy_tags": ["ptp-wireless", "high-bandwidth", "line-of-sight"] },
+
+  { "name": "Tycon RemotePro 100W Solar System", "category": "power", "cost_usd": 1600, "power_draw_w": 0.0, "env_rating": "ruggedized", "synergy_tags": ["solar", "autonomous", "renewable", "silent"], "supply_w": 100 },
+  { "name": "Renogy 200W Solar Kit + 100Ah AGM", "category": "power", "cost_usd": 850, "power_draw_w": 0.0, "env_rating": "outdoor", "synergy_tags": ["solar", "autonomous", "renewable", "silent"], "supply_w": 60 },
+  { "name": "Goal Zero Yeti 1500X Battery", "category": "power", "cost_usd": 2000, "power_draw_w": 0.0, "env_rating": "outdoor", "synergy_tags": ["battery", "silent", "portable"], "supply_w": 150 },
+  { "name": "MIL-STD-1275 Vehicle Power Adapter", "category": "power", "cost_usd": 400, "power_draw_w": 0.0, "env_rating": "milspec", "synergy_tags": ["vehicle-power", "high-capacity"], "supply_w": 300 },
+  { "name": "Honda EU2200i Generator", "category": "power", "cost_usd": 1100, "power_draw_w": 0.0, "env_rating": "outdoor", "synergy_tags": ["generator", "refuel-required", "high-capacity"], "supply_w": 1800 },
+
+  { "name": "Amphenol MIL-STD-810 Sealed Enclosure", "category": "housing", "cost_usd": 950, "power_draw_w": 0.0, "env_rating": "milspec", "synergy_tags": ["sealed", "emi-shielded"] },
+  { "name": "Pelican 1550 Case w/ Panel Mount", "category": "housing", "cost_usd": 350, "power_draw_w": 0.0, "env_rating": "ruggedized", "synergy_tags": ["sealed", "portable"] },
+  { "name": "Zarges K470 Aluminum Case", "category": "housing", "cost_usd": 500, "power_draw_w": 0.0, "env_rating": "ruggedized", "synergy_tags": ["sealed", "portable"] },
+  { "name": "Polycase NEMA 4X Outdoor Enclosure", "category": "housing", "cost_usd": 120, "power_draw_w": 0.0, "env_rating": "outdoor", "synergy_tags": ["weatherproof", "budget"] },
+  { "name": "2U Rack-Mount Indoor Chassis", "category": "housing", "cost_usd": 200, "power_draw_w": 0.0, "env_rating": "indoor", "synergy_tags": ["indoor-only"] }
+]
