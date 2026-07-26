@@ -1,0 +1,6 @@
+.venv/
+.jac/
+medusa/.jac/
+medusa/node_modules/
+medusa/dist/
+.DS_Store
