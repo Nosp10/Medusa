@@ -12,8 +12,6 @@ From this directory:
 MEDUSA_LLM_MODE=demo JAC_DISABLED_PLUGINS='jac-scale:*' ../.venv/bin/jac start --dev
 ```
 
-Open [http://localhost:8000](http://localhost:8000).
-
 The default `demo` mode is deterministic and requires no API credentials. To
 exercise the real byLLM selection boundary, configure a supported model and
 start with `MEDUSA_LLM_MODE=live`.
