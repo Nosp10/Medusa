@@ -9,8 +9,10 @@ import os;
 import from byllm.lib { MockLLM }
 import from src.demo_data {
     CategorySeed,
+    ProductRelationshipSeed,
     ProductSeed,
     category_seeds,
+    product_relationship_seeds,
     product_seeds,
 }
 
@@ -32,7 +34,8 @@ node Product {
         available: int,
         selected: int,
         specs: list[str],
-        relationships: list[str];
+        relationships: list[str],
+        scenario_tags: list[str] = [];
 }
 
 
@@ -47,30 +50,65 @@ sem Product.specs = "Verified and curated product specifications.";
 
 edge Contains: InventoryCategory --> Product {}
 
+edge ProductRelationship: Product --> Product {
+    has kind: str,
+        note: str;
+}
+
+
+node Mission {
+    has title: str;
+}
+
+
+node DesignSubsystem {
+    has key: str,
+        label: str;
+}
+
+
+node DesignDecision {
+    has status: str = "compatible";
+}
+
+
+node ProposalGraph {
+    has decision_key: str,
+        resolution_key: str,
+        total_cost: float,
+        scenario: str = "valid";
+}
+
+
+node VersionSelection {}
+
+
+edge OwnsMission: ProjectState --> Mission {}
+edge HasSubsystem: Mission --> DesignSubsystem {}
+edge HasDecision: DesignSubsystem --> DesignDecision {}
+edge SelectsProduct: DesignDecision --> Product {}
+edge OwnsProposal: ProjectState --> ProposalGraph {}
+edge ProposesSubsystem: ProposalGraph --> DesignSubsystem {}
+edge VersionContains: VersionRecord --> VersionSelection {}
+edge SnapshotSelects: VersionSelection --> Product {}
+edge Supersedes: VersionRecord --> VersionRecord {}
+
 
 node ProjectState {
     has answers: list[str],
-        selected_product_keys: list[str],
         total_cost: float,
+        budget: float,
         generation_mode: str,
         traversal_product_keys: list[str] = [],
         version: int = 1,
-        proposal_active: bool = False,
-        proposal_decision_key: str = "",
-        proposal_resolution_key: str = "",
-        proposal_product_keys: list[str] = [],
-        proposal_total_cost: float = 0.0,
-        proposal_scenario: str = "valid";
+        proposal_active: bool = False;
 }
 
 
 node VersionRecord {
     has number: int,
         label: str,
-        product_keys: list[str],
         total_cost: float,
-        added_product_keys: list[str],
-        removed_product_keys: list[str],
         summary: str;
 }
 
@@ -109,6 +147,14 @@ obj RequirementView {
         value: str,
         mandatory: bool,
         satisfied: bool;
+}
+
+
+obj MissionProfile {
+    has scenario_tag: str,
+        budget: float,
+        deployment: str,
+        environment: str;
 }
 
 
@@ -230,7 +276,7 @@ obj WorkspaceView {
 def _compatibility_assessments(
     state: ProjectState | None
 ) -> list[CompatibilityAssessmentView] {
-    if state is None or "sony-snc-vb632d" not in state.selected_product_keys {
+    if state is None or "sony-snc-vb632d" not in _selected_product_keys(state) {
         return [];
     }
     return [
@@ -354,34 +400,68 @@ def _selection_rationale(product: Product) -> str {
 }
 
 
-def _eligible(product: Product) -> bool {
+def _mission_profile(answers: list[str]) -> MissionProfile {
+    deployment = answers[1].lower();
+    environment = answers[5].lower();
+    mission = answers[0].lower();
+    scenario_tag = "thermal"
+        if "thermal" in mission or "thermal" in environment
+        else "vehicle"
+        if "vehicle" in deployment
+        else "baseline";
+    budget = 100000.0 if "100" in answers[8] else 75000.0;
+    return MissionProfile(
+        scenario_tag=scenario_tag,
+        budget=budget,
+        deployment=deployment,
+        environment=environment
+    );
+}
+
+
+def _eligible(product: Product, profile: MissionProfile) -> bool {
     if product.available <= product.selected {
         return False;
     }
-    return product.key not in [
-        "flir-boson-640",
-        "flir-ranger-hdc",
-        "dell-poweredge-xr4000z",
-        "raspberry-pi-5",
-        "synology-dva3221",
-        "silvus-sc4200",
-        "ubiquiti-rocket-prism",
-        "ecoflow-delta-pro",
-        "battle-born-100ah",
-        "victron-smartsolar-150-35",
-        "honda-eu2200i",
-        "flir-ptu-d300e",
-        "videotec-nxm36",
-        "manfrotto-161mk2b",
-        "tripp-lite-smart1500",
-        "synology-hat3300-4t",
-        "fluke-87v-max"
-    ];
+    return profile.scenario_tag in product.scenario_tags;
+}
+
+
+def _validate_generated_design(
+    origin: Root, selected_keys: list[str], profile: MissionProfile
+) -> str {
+    for category_key in [
+        "sensors", "compute", "communications", "power", "structures", "support"
+    ] {
+        selected_for_category = False;
+        for key in selected_keys {
+            product = _product_by_key(origin, key);
+            if product is not None and product.category == category_key {
+                selected_for_category = True;
+            }
+        }
+        if not selected_for_category {
+            return f"Generation did not select an eligible {category_key} product for the mission profile.";
+        }
+    }
+    total_cost: float = 0.0;
+    for key in selected_keys {
+        product = _product_by_key(origin, key);
+        if product is None or product.available <= product.selected {
+            return "Generation selected inventory that is no longer available.";
+        }
+        total_cost += product.unit_cost;
+    }
+    if total_cost > profile.budget {
+        return f"Generation exceeds the interpreted ${profile.budget:,.0f} budget.";
+    }
+    return "";
 }
 
 
 walker _SelectDesign {
     has goal: str,
+        profile: MissionProfile,
         selected_products: list[Product] = [],
         traversal: list[TraversalStepView] = [];
 
@@ -393,7 +473,7 @@ walker _SelectDesign {
         candidates: list[Product] = [
             product
             for product in [here ->:Contains:->]
-            if _eligible(product)
+            if _eligible(product, self.profile)
         ];
         if _live_llm {
             visit candidates by llm(
@@ -458,6 +538,117 @@ def _product_by_key(origin: Root, key: str) -> Product | None {
         }
     }
     return None;
+}
+
+
+def _selected_product_keys(state: ProjectState | None) -> list[str] {
+    if state is None {
+        return [];
+    }
+    missions = [state ->:OwnsMission:->];
+    if not missions {
+        return [];
+    }
+    keys: list[str] = [];
+    for subsystem in [missions[0] ->:HasSubsystem:->] {
+        for decision in [subsystem ->:HasDecision:->] {
+            for product in [decision ->:SelectsProduct:->] {
+                keys.append(product.key);
+            }
+        }
+    }
+    return keys;
+}
+
+
+def _proposal_graph(state: ProjectState | None) -> ProposalGraph | None {
+    if state is None {
+        return None;
+    }
+    proposals = [state ->:OwnsProposal:->];
+    return proposals[0] if proposals else None;
+}
+
+
+def _proposal_product_keys(state: ProjectState | None) -> list[str] {
+    proposal = _proposal_graph(state);
+    if proposal is None {
+        return [];
+    }
+    keys: list[str] = [];
+    for subsystem in [proposal ->:ProposesSubsystem:->] {
+        for decision in [subsystem ->:HasDecision:->] {
+            for product in [decision ->:SelectsProduct:->] {
+                keys.append(product.key);
+            }
+        }
+    }
+    return keys;
+}
+
+
+def _persist_design(
+    origin: Root,
+    state: ProjectState,
+    product_keys: list[str],
+    proposal: ProposalGraph | None = None
+) {
+    parent = proposal if proposal is not None else (
+        state +>:OwnsMission:+> Mission(title="Adverse-weather perimeter monitoring")
+    )[0];
+    labels: dict[str, str] = {
+        "sensors": "Detect & track",
+        "compute": "Edge compute",
+        "communications": "Alerts & backhaul",
+        "power": "Field power",
+        "structures": "Mount & protect",
+        "support": "Verify & sustain"
+    };
+    for category_key in [
+        "sensors", "compute", "communications", "power", "structures", "support"
+    ] {
+        subsystem = DesignSubsystem(key=category_key, label=labels[category_key]);
+        if proposal is not None {
+            parent +>:ProposesSubsystem:+> subsystem;
+        } else {
+            parent +>:HasSubsystem:+> subsystem;
+        }
+        for key in product_keys {
+            product = _product_by_key(origin, key);
+            if product is not None and product.category == category_key {
+                decision = DesignDecision(
+                    status="conditional" if key == "sony-snc-vb632d" else "compatible"
+                );
+                subsystem +>:HasDecision:+> decision;
+                decision +>:SelectsProduct:+> product;
+            }
+        }
+    }
+}
+
+
+def _snapshot_product_keys(record: VersionRecord) -> list[str] {
+    keys: list[str] = [];
+    for selection in [record ->:VersionContains:->] {
+        for product in [selection ->:SnapshotSelects:->] {
+            keys.append(product.key);
+        }
+    }
+    return keys;
+}
+
+
+def _persist_version_snapshot(
+    origin: Root, record: VersionRecord, product_keys: list[str]
+) {
+    selection = VersionSelection();
+    record +>:VersionContains:+> selection;
+    for key in product_keys {
+        product = _product_by_key(origin, key);
+        if product is not None {
+            selection +>:SnapshotSelects:+> product;
+        }
+    }
 }
 
 
@@ -671,31 +862,34 @@ def _workflow(selected_product_keys: list[str]) -> list[WorkflowStageView] {
 def _proposal_view(
     origin: Root, state: ProjectState | None
 ) -> ProposalView | None {
-    if state is None or not state.proposal_active {
+    proposal_graph = _proposal_graph(state);
+    if state is None or proposal_graph is None {
         return None;
     }
+    baseline_keys = _selected_product_keys(state);
+    proposed_keys = _proposal_product_keys(state);
     removed = [
         key
-        for key in state.selected_product_keys
-        if key not in state.proposal_product_keys
+        for key in baseline_keys
+        if key not in proposed_keys
     ];
     added = [
         key
-        for key in state.proposal_product_keys
-        if key not in state.selected_product_keys
+        for key in proposed_keys
+        if key not in baseline_keys
     ];
     return ProposalView(
         active=True,
-        decision_key=state.proposal_decision_key,
-        resolution_key=state.proposal_resolution_key,
-        baseline_product_keys=state.selected_product_keys,
-        proposed_product_keys=state.proposal_product_keys,
+        decision_key=proposal_graph.decision_key,
+        resolution_key=proposal_graph.resolution_key,
+        baseline_product_keys=baseline_keys,
+        proposed_product_keys=proposed_keys,
         removed_product_keys=removed,
         added_product_keys=added,
-        projected_cost=state.proposal_total_cost,
-        cost_delta=state.proposal_total_cost - state.total_cost,
-        design_nodes=_design_nodes(origin, state.proposal_product_keys),
-        workflow=_workflow(state.proposal_product_keys),
+        projected_cost=proposal_graph.total_cost,
+        cost_delta=proposal_graph.total_cost - state.total_cost,
+        design_nodes=_design_nodes(origin, proposed_keys),
+        workflow=_workflow(proposed_keys),
         downstream_effects=_compatibility_assessments(state)[0].downstream_effects,
         rationale="Replace the unverified low-light weather path with an in-stock IP67 thermal assembly and propagate its mechanical, power, software, communications, and validation effects."
     );
@@ -705,10 +899,11 @@ def _proposal_view(
 def _approval_gates(
     state: ProjectState | None
 ) -> list[ApprovalGateView] {
-    if state is None or not state.proposal_active {
+    proposal = _proposal_graph(state);
+    if state is None or proposal is None {
         return [];
     }
-    scenario = state.proposal_scenario;
+    scenario = proposal.scenario;
     return [
         ApprovalGateView(
             key="compatibility",
@@ -730,9 +925,9 @@ def _approval_gates(
             key="budget",
             title="Project budget",
             status="blocked" if scenario == "budget" else "passed",
-            detail="Projected cost exceeds the $75,000 budget."
+            detail=f"Projected cost exceeds the ${state.budget:,.0f} budget."
             if scenario == "budget"
-            else f"Projected cost is ${state.proposal_total_cost:,.0f}, within the $75,000 budget."
+            else f"Projected cost is ${proposal.total_cost:,.0f}, within the ${state.budget:,.0f} budget."
         ),
         ApprovalGateView(
             key="requirements",
@@ -760,9 +955,11 @@ def _versions(
     }
     views: list[VersionView] = [];
     records = [origin -->[?:VersionRecord]];
+    previous_keys: list[str] = [];
     for number in range(1, state.version + 1) {
         for record in records {
             if record.number == number {
+                product_keys = _snapshot_product_keys(record);
                 views.append(
                     VersionView(
                         number=record.number,
@@ -770,13 +967,18 @@ def _versions(
                         status="active"
                         if record.number == state.version
                         else "historical",
-                        product_keys=record.product_keys,
+                        product_keys=product_keys,
                         total_cost=record.total_cost,
-                        added_product_keys=record.added_product_keys,
-                        removed_product_keys=record.removed_product_keys,
+                        added_product_keys=[
+                            key for key in product_keys if key not in previous_keys
+                        ],
+                        removed_product_keys=[
+                            key for key in previous_keys if key not in product_keys
+                        ],
                         summary=record.summary
                     )
                 );
+                previous_keys = product_keys;
             }
         }
     }
@@ -810,6 +1012,7 @@ def _traversal(
 
 def _seed_inventory(origin: Root) {
     categories_by_key: dict[str, InventoryCategory] = {};
+    products_by_key: dict[str, Product] = {};
     for category_seed in category_seeds() {
         category = (
             origin ++> InventoryCategory(
@@ -831,9 +1034,44 @@ def _seed_inventory(origin: Root) {
             available=product_seed.available,
             selected=0,
             specs=product_seed.specs,
-            relationships=product_seed.relationships
+            relationships=product_seed.relationships,
+            scenario_tags=product_seed.scenario_tags
         );
         categories_by_key[product_seed.category] +>:Contains:+> product;
+        products_by_key[product.key] = product;
+    }
+    for relationship_seed in product_relationship_seeds() {
+        source = products_by_key[relationship_seed.from_key];
+        target = products_by_key[relationship_seed.to_key];
+        source +>:ProductRelationship(
+            kind=relationship_seed.kind,
+            note=relationship_seed.note
+        ):+> target;
+    }
+}
+
+
+def _ensure_seeded_inventory(origin: Root) {
+    categories = [origin -->[?:InventoryCategory]];
+    needs_reseed = len(categories) == 0;
+    for category in categories {
+        for product in [category ->:Contains:->] {
+            if len(product.scenario_tags) == 0 {
+                needs_reseed = True;
+            }
+        }
+    }
+    if needs_reseed {
+        for state in [origin -->[?:ProjectState]] {
+            del state;
+        }
+        for version in [origin -->[?:VersionRecord]] {
+            del version;
+        }
+        for category in categories {
+            del category;
+        }
+        _seed_inventory(origin);
     }
 }
 
@@ -858,16 +1096,17 @@ def _workspace(origin: Root) -> WorkspaceView {
         );
     }
     state = _project_state(origin);
+    selected_keys = _selected_product_keys(state);
     return WorkspaceView(
         categories=categories,
         products=products,
         project_active=state is not None,
         current_version=state.version if state is not None else 0,
         requirements=_requirements(state.answers) if state is not None else [],
-        design_nodes=_design_nodes(origin, state.selected_product_keys)
+        design_nodes=_design_nodes(origin, selected_keys)
         if state is not None
         else [],
-        workflow=_workflow(state.selected_product_keys)
+        workflow=_workflow(selected_keys)
         if state is not None
         else [],
         traversal=_traversal(origin, state),
@@ -876,10 +1115,11 @@ def _workspace(origin: Root) -> WorkspaceView {
         gates=_approval_gates(state),
         approval_ready=_approval_ready(state),
         versions=_versions(origin, state),
-        selected_product_keys=state.selected_product_keys
+        selected_product_keys=selected_keys
         if state is not None
         else [],
         total_cost=state.total_cost if state is not None else 0.0,
+        budget=state.budget if state is not None else 75000.0,
         generation_mode=state.generation_mode
         if state is not None
         else "not-started"
@@ -891,9 +1131,7 @@ walker:pub LoadWorkspace {
     has reports: list[WorkspaceView] = [];
 
     can load with Root entry {
-        if len([here -->[?:InventoryCategory]]) == 0 {
-            _seed_inventory(here);
-        }
+        _ensure_seeded_inventory(here);
         report _workspace(here);
     }
 }
@@ -904,9 +1142,7 @@ walker:pub CreateProject {
     has reports: list[WorkspaceView] = [];
 
     can create with Root entry {
-        if len([here -->[?:InventoryCategory]]) == 0 {
-            _seed_inventory(here);
-        }
+        _ensure_seeded_inventory(here);
         if len(self.answers) != 9 {
             invalid = _workspace(here);
             invalid.error = "Mission intake requires exactly nine answers.";
@@ -925,25 +1161,20 @@ walker:pub CreateProject {
         }
 
         try {
-            generated = here spawn _SelectDesign(goal=self.answers[0]);
+            profile = _mission_profile(self.answers);
+            generated = here spawn _SelectDesign(
+                goal=self.answers[0],
+                profile=profile
+            );
             selected_keys = [
                 product.key for product in generated.selected_products
             ];
-            required_demo_keys = [
-                "sony-snc-vb632d",
-                "echodyne-echoguard",
-                "jetson-agx-orin",
-                "peplink-max-br1-pro",
-                "rajant-dx2",
-                "goal-zero-yeti-6000x",
-                "pelco-es6230",
-                "will-burt-hurry-up",
-                "vaisala-wxt536",
-                "moxa-iologik-e1214"
-            ];
-            if not all(key in selected_keys for key in required_demo_keys) {
+            validation_error = _validate_generated_design(
+                here, selected_keys, profile
+            );
+            if validation_error != "" {
                 failed = _workspace(here);
-                failed.error = "The constrained generation did not produce a complete mission design. No project state was changed.";
+                failed.error = validation_error;
                 report failed;
                 disengage;
             }
@@ -952,22 +1183,21 @@ walker:pub CreateProject {
                 product.selected = 1;
                 total_cost += product.unit_cost;
             }
-            here ++> ProjectState(
+            state = (here ++> ProjectState(
                 answers=self.answers,
-                selected_product_keys=selected_keys,
                 traversal_product_keys=selected_keys,
                 total_cost=total_cost,
+                budget=profile.budget,
                 generation_mode=_generation_mode()
-            );
-            here ++> VersionRecord(
+            ))[0];
+            _persist_design(here, state, selected_keys);
+            initial_version = (here ++> VersionRecord(
                 number=1,
                 label="Initial mission design",
-                product_keys=list(selected_keys),
                 total_cost=total_cost,
-                added_product_keys=list(selected_keys),
-                removed_product_keys=[],
                 summary="Constrained LLM-guided traversal created the first mainline design."
-            );
+            ))[0];
+            _persist_version_snapshot(here, initial_version, selected_keys);
             report _workspace(here);
         } except Exception as generation_error {
             failed = _workspace(here);
@@ -1006,35 +1236,39 @@ walker:pub ProposeChange {
             "videotec-nxm36",
             "victron-smartsolar-150-35"
         ];
-        if any(
-            _product_by_key(here, key) is None
-            or _product_by_key(here, key).available
-                <= _product_by_key(here, key).selected
-            for key in added_keys
-        ) {
-            blocked = _workspace(here);
-            blocked.error = "The thermal proposal requires inventory that is no longer available.";
-            report blocked;
-            disengage;
+        for key in added_keys {
+            candidate = _product_by_key(here, key);
+            if candidate is None or candidate.available <= candidate.selected {
+                blocked = _workspace(here);
+                blocked.error = "The thermal proposal requires inventory that is no longer available.";
+                report blocked;
+                disengage;
+            }
         }
 
+        baseline_keys = _selected_product_keys(state);
         proposed_keys = [
             key
-            for key in state.selected_product_keys
+            for key in baseline_keys
             if key not in ["sony-snc-vb632d", "pelco-es6230"]
         ] + added_keys;
         proposed_cost: float = 0.0;
         for key in proposed_keys {
-            proposed_cost += _product_by_key(here, key).unit_cost;
+            candidate = _product_by_key(here, key);
+            if candidate is not None {
+                proposed_cost += candidate.unit_cost;
+            }
         }
-        state.proposal_active = True;
-        state.proposal_decision_key = self.decision_key;
-        state.proposal_resolution_key = self.resolution_key;
-        state.proposal_product_keys = proposed_keys;
-        state.proposal_total_cost = 82000.0
+        for existing in [state ->:OwnsProposal:->] {
+            del existing;
+        }
+        proposal = ProposalGraph(
+            decision_key=self.decision_key,
+            resolution_key=self.resolution_key,
+            total_cost=82000.0
             if self.scenario == "budget"
-            else proposed_cost;
-        state.proposal_scenario = self.scenario
+            else proposed_cost,
+            scenario=self.scenario
             if self.scenario in [
                 "valid",
                 "incompatible",
@@ -1042,7 +1276,11 @@ walker:pub ProposeChange {
                 "budget",
                 "requirement"
             ]
-            else "valid";
+            else "valid"
+        );
+        state +>:OwnsProposal:+> proposal;
+        _persist_design(here, state, proposed_keys, proposal=proposal);
+        state.proposal_active = True;
         report _workspace(here);
     }
 }
@@ -1053,7 +1291,15 @@ walker:pub ApproveProposal {
 
     can approve with Root entry {
         state = _project_state(here);
-        if state is None or not state.proposal_active {
+        if state is None {
+            missing = _workspace(here);
+            missing.error = "There is no active proposal to approve.";
+            report missing;
+            disengage;
+        }
+        assert state is not None;
+        proposal = _proposal_graph(state);
+        if proposal is None {
             missing = _workspace(here);
             missing.error = "There is no active proposal to approve.";
             report missing;
@@ -1067,39 +1313,42 @@ walker:pub ApproveProposal {
                 "budget": "Approval blocked: the proposal exceeds the project budget.",
                 "requirement": "Approval blocked: a mandatory requirement has no proposed solution."
             };
-            blocked.error = messages[state.proposal_scenario];
+            blocked.error = messages[proposal.scenario];
             report blocked;
             disengage;
         }
-        before_keys = list(state.selected_product_keys);
-        after_keys = list(state.proposal_product_keys);
-        added_keys = [key for key in after_keys if key not in before_keys];
-        removed_keys = [key for key in before_keys if key not in after_keys];
-        next_version = state.version + 1;
+        after_keys = _proposal_product_keys(state);
+        current_version = state.version;
+        next_version = current_version + 1;
 
         for category in [here -->[?:InventoryCategory]] {
             for product in [category ->:Contains:->] {
                 product.selected = 1 if product.key in after_keys else 0;
             }
         }
-        here ++> VersionRecord(
+        version_record = (here ++> VersionRecord(
             number=next_version,
             label="Weather-rated thermal revision",
-            product_keys=list(after_keys),
-            total_cost=state.proposal_total_cost,
-            added_product_keys=added_keys,
-            removed_product_keys=removed_keys,
+            total_cost=proposal.total_cost,
             summary="Approved the guided thermal resolution and retained the initial design as immutable history."
-        );
-        state.selected_product_keys = after_keys;
-        state.total_cost = state.proposal_total_cost;
+        ))[0];
+        _persist_version_snapshot(here, version_record, after_keys);
+        previous_versions = [
+            record
+            for record in [here -->[?:VersionRecord]]
+            if record.number == current_version
+        ];
+        if previous_versions {
+            version_record +>:Supersedes:+> previous_versions[0];
+        }
+        state.total_cost = proposal.total_cost;
         state.version = next_version;
         state.proposal_active = False;
-        state.proposal_decision_key = "";
-        state.proposal_resolution_key = "";
-        state.proposal_product_keys = [];
-        state.proposal_total_cost = 0.0;
-        state.proposal_scenario = "valid";
+        for mission in [state ->:OwnsMission:->] {
+            del mission;
+        }
+        _persist_design(here, state, after_keys);
+        del proposal;
         report _workspace(here);
     }
 }
@@ -1109,9 +1358,7 @@ walker:pub ResetDemo {
     has reports: list[WorkspaceView] = [];
 
     can reset with Root entry {
-        if len([here -->[?:InventoryCategory]]) == 0 {
-            _seed_inventory(here);
-        }
+        _ensure_seeded_inventory(here);
         for state in [here -->[?:ProjectState]] {
             del state;
         }

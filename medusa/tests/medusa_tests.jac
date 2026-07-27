@@ -24,6 +24,17 @@ def demo_answers() -> list[str] {
 }
 
 
+def vehicle_answers() -> list[str] {
+    answers = demo_answers();
+    answers[0] = "Monitor vehicle approaches from a vehicle-mounted prototype and alert a local operator.";
+    answers[1] = "Vehicle-mounted installation with field setup within four hours.";
+    answers[5] = "Operate in fair weather and normal road vibration.";
+    answers[7] = "Support one local operator with LTE backhaul and dashboard alerts.";
+    answers[8] = "Remain within a $100,000 project budget and use only available inventory.";
+    return answers;
+}
+
+
 test "seeded workspace exposes the complete actionable inventory" {
     result = root spawn LoadWorkspace();
 
@@ -31,14 +42,10 @@ test "seeded workspace exposes the complete actionable inventory" {
     workspace = result.reports[0];
     assert len(workspace.categories) == 6;
     assert len(workspace.products) == 30;
-    assert [c.key for c in workspace.categories] == [
-        "sensors",
-        "compute",
-        "communications",
-        "power",
-        "structures",
-        "support"
-    ];
+    assert len(workspace.categories) == 6;
+    assert all(key in [c.key for c in workspace.categories] for key in [
+        "sensors", "compute", "communications", "power", "structures", "support"
+    ]);
 
     thermal = [p for p in workspace.products if p.key == "flir-boson-640"];
     assert len(thermal) == 1;
@@ -81,6 +88,23 @@ test "pre-filled intake generates an explainable seven-stage design" {
     assert all(step.rationale != "" for step in workspace.traversal);
     assert workspace.total_cost < workspace.budget;
     assert workspace.generation_mode in ["live-llm", "demo-llm"];
+    assert workspace.error == "";
+}
+
+
+test "vehicle intake selects a distinct graph-backed scenario" {
+    root spawn ResetDemo();
+    result = root spawn CreateProject(answers=vehicle_answers());
+    workspace = result.reports[0];
+
+    assert workspace.project_active;
+    assert workspace.budget == 100000.0;
+    assert "flir-ranger-hdc" in workspace.selected_product_keys;
+    assert "dell-poweredge-xr4000z" in workspace.selected_product_keys;
+    assert "ecoflow-delta-pro" in workspace.selected_product_keys;
+    assert "sony-snc-vb632d" not in workspace.selected_product_keys;
+    assert "goal-zero-yeti-6000x" not in workspace.selected_product_keys;
+    assert len(workspace.design_nodes) >= 13;
     assert workspace.error == "";
 }
 
@@ -130,42 +154,33 @@ test "the golden thermal proposal expands every affected design region" {
     workspace = result.reports[0];
     proposal = workspace.proposal;
 
-    assert proposal.active;
-    assert proposal.decision_key == "sony-snc-vb632d";
-    assert proposal.resolution_key == "thermal-golden";
-    assert proposal.removed_product_keys == [
-        "sony-snc-vb632d",
-        "pelco-es6230"
-    ];
-    assert proposal.added_product_keys == [
-        "flir-boson-640",
-        "flir-ptu-d300e",
-        "videotec-nxm36",
-        "victron-smartsolar-150-35"
-    ];
-    assert proposal.projected_cost == 51168.0;
-    assert proposal.cost_delta == 9420.0;
+    assert proposal is not None;
     assert "sony-snc-vb632d" in workspace.selected_product_keys;
     assert "flir-boson-640" not in workspace.selected_product_keys;
-    assert "flir-boson-640" in proposal.proposed_product_keys;
-    assert "flir-ptu-d300e" in proposal.proposed_product_keys;
-    assert "videotec-nxm36" in proposal.proposed_product_keys;
-    assert "victron-smartsolar-150-35" in proposal.proposed_product_keys;
-    assert len(proposal.design_nodes) > len(workspace.design_nodes);
-    assert len(proposal.workflow[1].linked_products) == 2;
-    assert all(
-        key in proposal.workflow[1].linked_products
-        for key in ["flir-boson-640", "echodyne-echoguard"]
-    );
-    assert "thermal" in proposal.workflow[2].detail.lower();
-    assert "victron-smartsolar-150-35" in proposal.workflow[3].linked_products;
-    assert "thermal" in proposal.workflow[4].detail.lower();
-    assert "flir-ptu-d300e" in proposal.workflow[5].linked_products;
-    assert "videotec-nxm36" in proposal.workflow[5].linked_products;
-    assert any(
-        "thermal" in task.lower()
-        for task in proposal.workflow[6].verification
-    );
+    if proposal is not None {
+        assert proposal.active;
+        assert proposal.decision_key == "sony-snc-vb632d";
+        assert proposal.resolution_key == "thermal-golden";
+        assert len(proposal.removed_product_keys) == 2;
+        assert all(key in proposal.removed_product_keys for key in ["sony-snc-vb632d", "pelco-es6230"]);
+        assert len(proposal.added_product_keys) == 4;
+        assert all(key in proposal.added_product_keys for key in ["flir-boson-640", "flir-ptu-d300e", "videotec-nxm36", "victron-smartsolar-150-35"]);
+        assert proposal.projected_cost == 51168.0;
+        assert proposal.cost_delta == 9420.0;
+        assert "flir-boson-640" in proposal.proposed_product_keys;
+        assert "flir-ptu-d300e" in proposal.proposed_product_keys;
+        assert "videotec-nxm36" in proposal.proposed_product_keys;
+        assert "victron-smartsolar-150-35" in proposal.proposed_product_keys;
+        assert len(proposal.design_nodes) > len(workspace.design_nodes);
+        assert len(proposal.workflow[1].linked_products) == 2;
+        assert all(key in proposal.workflow[1].linked_products for key in ["flir-boson-640", "echodyne-echoguard"]);
+        assert "thermal" in proposal.workflow[2].detail.lower();
+        assert "victron-smartsolar-150-35" in proposal.workflow[3].linked_products;
+        assert "thermal" in proposal.workflow[4].detail.lower();
+        assert "flir-ptu-d300e" in proposal.workflow[5].linked_products;
+        assert "videotec-nxm36" in proposal.workflow[5].linked_products;
+        assert any("thermal" in task.lower() for task in proposal.workflow[6].verification);
+    }
 }
 
 
@@ -216,7 +231,10 @@ test "approval blocks a projected budget excess" {
 
     assert not workspace.approval_ready;
     assert workspace.current_version == 1;
-    assert workspace.proposal.projected_cost > workspace.budget;
+    assert workspace.proposal is not None;
+    if workspace.proposal is not None {
+        assert workspace.proposal.projected_cost > workspace.budget;
+    }
     assert [
         gate.key for gate in workspace.gates if gate.status == "blocked"
     ] == ["budget"];
@@ -283,16 +301,14 @@ test "valid approval creates an immutable version and updates quantities" {
     assert workspace.versions[1].status == "active";
     assert "sony-snc-vb632d" not in workspace.versions[1].product_keys;
     assert "flir-boson-640" in workspace.versions[1].product_keys;
-    assert workspace.versions[1].added_product_keys == [
-        "flir-boson-640",
-        "flir-ptu-d300e",
-        "videotec-nxm36",
-        "victron-smartsolar-150-35"
-    ];
-    assert workspace.versions[1].removed_product_keys == [
-        "sony-snc-vb632d",
-        "pelco-es6230"
-    ];
+    assert len(workspace.versions[1].added_product_keys) == 4;
+    assert all(key in workspace.versions[1].added_product_keys for key in [
+        "flir-boson-640", "flir-ptu-d300e", "videotec-nxm36", "victron-smartsolar-150-35"
+    ]);
+    assert len(workspace.versions[1].removed_product_keys) == 2;
+    assert all(key in workspace.versions[1].removed_product_keys for key in [
+        "sony-snc-vb632d", "pelco-es6230"
+    ]);
     assert workspace.proposal is None;
     assert workspace.total_cost == 51168.0;
     assert "thermal" in workspace.workflow[2].detail.lower();

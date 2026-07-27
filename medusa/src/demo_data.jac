@@ -17,7 +17,16 @@ obj ProductSeed {
         owned: int,
         available: int,
         specs: list[str],
-        relationships: list[str];
+        relationships: list[str],
+        scenario_tags: list[str] = [];
+}
+
+
+obj ProductRelationshipSeed {
+    has from_key: str,
+        to_key: str,
+        kind: str,
+        note: str;
 }
 
 
@@ -77,7 +86,8 @@ def product_seeds() -> list[ProductSeed] {
                 "Streams H.264 to edge compute",
                 "Requires weather enclosure",
                 "Requires vibration-qualified mount"
-            ]
+            ],
+            scenario_tags=["baseline"]
         ),
         ProductSeed(
             key="flir-boson-640",
@@ -97,7 +107,8 @@ def product_seeds() -> list[ProductSeed] {
                 "USB and MIPI video interfaces",
                 "Pairs with PTU-D300E mount",
                 "Adds thermal inference profile"
-            ]
+            ],
+            scenario_tags=["thermal"]
         ),
         ProductSeed(
             key="axis-q6315-le",
@@ -116,7 +127,8 @@ def product_seeds() -> list[ProductSeed] {
             relationships=[
                 "Compatible with operator dashboard",
                 "Blocked by zero available quantity"
-            ]
+            ],
+            scenario_tags=["baseline", "vehicle", "thermal"]
         ),
         ProductSeed(
             key="echodyne-echoguard",
@@ -135,7 +147,8 @@ def product_seeds() -> list[ProductSeed] {
             relationships=[
                 "Cues optical and thermal sensors",
                 "Requires mast alignment verification"
-            ]
+            ],
+            scenario_tags=["baseline", "vehicle", "thermal"]
         ),
         ProductSeed(
             key="flir-ranger-hdc",
@@ -154,7 +167,8 @@ def product_seeds() -> list[ProductSeed] {
             relationships=[
                 "Exceeds portable power preference",
                 "Consumes most of project budget"
-            ]
+            ],
+            scenario_tags=["vehicle"]
         ),
         ProductSeed(
             key="jetson-agx-orin",
@@ -173,7 +187,8 @@ def product_seeds() -> list[ProductSeed] {
             relationships=[
                 "Runs thermal and visible inference",
                 "Publishes tracks to alert gateway"
-            ]
+            ],
+            scenario_tags=["baseline", "thermal"]
         ),
         ProductSeed(
             key="dell-poweredge-xr4000z",
@@ -192,7 +207,8 @@ def product_seeds() -> list[ProductSeed] {
             relationships=[
                 "Requires inverter or facility power",
                 "Hosts central recording services"
-            ]
+            ],
+            scenario_tags=["vehicle"]
         ),
         ProductSeed(
             key="raspberry-pi-5",
@@ -268,7 +284,8 @@ def product_seeds() -> list[ProductSeed] {
             relationships=[
                 "Carries dashboard alerts over LTE",
                 "Falls back to mesh radio gateway"
-            ]
+            ],
+            scenario_tags=["baseline", "vehicle", "thermal"]
         ),
         ProductSeed(
             key="rajant-dx2",
@@ -287,7 +304,8 @@ def product_seeds() -> list[ProductSeed] {
             relationships=[
                 "Extends around line-of-sight gap",
                 "Backhauls to LTE gateway"
-            ]
+            ],
+            scenario_tags=["baseline", "thermal"]
         ),
         ProductSeed(
             key="silvus-sc4200",
@@ -306,7 +324,8 @@ def product_seeds() -> list[ProductSeed] {
             relationships=[
                 "Supports high-rate video backhaul",
                 "Power draw reduces battery margin"
-            ]
+            ],
+            scenario_tags=["vehicle"]
         ),
         ProductSeed(
             key="ubiquiti-rocket-prism",
@@ -363,7 +382,8 @@ def product_seeds() -> list[ProductSeed] {
             relationships=[
                 "Meets twelve-hour system runtime",
                 "Accepts solar assistance"
-            ]
+            ],
+            scenario_tags=["baseline", "thermal"]
         ),
         ProductSeed(
             key="ecoflow-delta-pro",
@@ -382,7 +402,8 @@ def product_seeds() -> list[ProductSeed] {
             relationships=[
                 "Powers compute and communications",
                 "Can parallel with spare battery"
-            ]
+            ],
+            scenario_tags=["vehicle"]
         ),
         ProductSeed(
             key="battle-born-100ah",
@@ -458,7 +479,8 @@ def product_seeds() -> list[ProductSeed] {
             relationships=[
                 "Supports visible camera payload",
                 "Power interface conditional with 12 V bus"
-            ]
+            ],
+            scenario_tags=["baseline"]
         ),
         ProductSeed(
             key="flir-ptu-d300e",
@@ -477,7 +499,8 @@ def product_seeds() -> list[ProductSeed] {
             relationships=[
                 "Qualified for Boson thermal assembly",
                 "Requires mount adapter plate"
-            ]
+            ],
+            scenario_tags=["vehicle", "thermal"]
         ),
         ProductSeed(
             key="videotec-nxm36",
@@ -496,7 +519,8 @@ def product_seeds() -> list[ProductSeed] {
             relationships=[
                 "Encloses Boson integration assembly",
                 "Adds heater power in cold weather"
-            ]
+            ],
+            scenario_tags=["thermal"]
         ),
         ProductSeed(
             key="will-burt-hurry-up",
@@ -515,7 +539,8 @@ def product_seeds() -> list[ProductSeed] {
             relationships=[
                 "Raises radar and communications",
                 "Requires high-wind guy verification"
-            ]
+            ],
+            scenario_tags=["baseline", "thermal"]
         ),
         ProductSeed(
             key="manfrotto-161mk2b",
@@ -572,7 +597,8 @@ def product_seeds() -> list[ProductSeed] {
             relationships=[
                 "Records mission-condition evidence",
                 "Feeds validation dashboard"
-            ]
+            ],
+            scenario_tags=["baseline", "thermal"]
         ),
         ProductSeed(
             key="synology-hat3300-4t",
@@ -610,7 +636,8 @@ def product_seeds() -> list[ProductSeed] {
             relationships=[
                 "Monitors enclosure state",
                 "Reports battery and tamper alarms"
-            ]
+            ],
+            scenario_tags=["baseline", "vehicle", "thermal"]
         ),
         ProductSeed(
             key="fluke-87v-max",
@@ -629,7 +656,33 @@ def product_seeds() -> list[ProductSeed] {
             relationships=[
                 "Verifies voltage drop and grounding",
                 "Linked to assembly workflow"
-            ]
+            ],
+            scenario_tags=["vehicle"]
         )
+    ];
+}
+
+
+def product_relationship_seeds() -> list[ProductRelationshipSeed] {
+    # ProductSeed.relationships remains curated display/evidence prose. These
+    # records carry the demo-critical facts in a form walkers can traverse.
+    return [
+        ProductRelationshipSeed(from_key="sony-snc-vb632d", to_key="jetson-agx-orin", kind="video-to-compute", note="Visible stream feeds edge inference."),
+        ProductRelationshipSeed(from_key="sony-snc-vb632d", to_key="pelco-es6230", kind="requires-mount", note="Visible camera needs its weather enclosure and mount."),
+        ProductRelationshipSeed(from_key="echodyne-echoguard", to_key="will-burt-hurry-up", kind="requires-mast", note="Radar requires elevated field placement."),
+        ProductRelationshipSeed(from_key="echodyne-echoguard", to_key="jetson-agx-orin", kind="track-to-compute", note="Radar tracks are fused at the edge."),
+        ProductRelationshipSeed(from_key="jetson-agx-orin", to_key="peplink-max-br1-pro", kind="alerts-over", note="Edge detections travel through the LTE gateway."),
+        ProductRelationshipSeed(from_key="peplink-max-br1-pro", to_key="rajant-dx2", kind="fallback-link", note="Mesh is the local communications fallback."),
+        ProductRelationshipSeed(from_key="goal-zero-yeti-6000x", to_key="jetson-agx-orin", kind="powers", note="Portable battery powers edge compute."),
+        ProductRelationshipSeed(from_key="goal-zero-yeti-6000x", to_key="peplink-max-br1-pro", kind="powers", note="Portable battery powers LTE gateway."),
+        ProductRelationshipSeed(from_key="will-burt-hurry-up", to_key="vaisala-wxt536", kind="hosts", note="Mast carries weather evidence instrumentation."),
+        ProductRelationshipSeed(from_key="will-burt-hurry-up", to_key="moxa-iologik-e1214", kind="hosts", note="Mast enclosure includes telemetry."),
+        ProductRelationshipSeed(from_key="flir-boson-640", to_key="flir-ptu-d300e", kind="requires-mount", note="Thermal assembly requires high-payload pan-tilt."),
+        ProductRelationshipSeed(from_key="flir-boson-640", to_key="videotec-nxm36", kind="requires-enclosure", note="Thermal assembly requires harsh-weather enclosure."),
+        ProductRelationshipSeed(from_key="flir-boson-640", to_key="victron-smartsolar-150-35", kind="requires-power-adaptation", note="Thermal path requires regulated field power."),
+        ProductRelationshipSeed(from_key="flir-boson-640", to_key="jetson-agx-orin", kind="video-to-compute", note="Thermal imagery feeds calibrated edge inference."),
+        ProductRelationshipSeed(from_key="flir-ptu-d300e", to_key="will-burt-hurry-up", kind="mounts-on", note="Thermal pan-tilt mounts to portable mast."),
+        ProductRelationshipSeed(from_key="videotec-nxm36", to_key="will-burt-hurry-up", kind="mounts-on", note="Weather enclosure mounts to portable mast."),
+        ProductRelationshipSeed(from_key="victron-smartsolar-150-35", to_key="goal-zero-yeti-6000x", kind="power-support", note="Controller supports the portable energy system.")
     ];
 }
